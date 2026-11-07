@@ -586,6 +586,12 @@ IFS= read -r -d '' SHARED_INFRA_RULE <<'EOF' || true
 EOF
 SHARED_INFRA_RULE=${SHARED_INFRA_RULE%$'\n'}
 
+# Dependency and framework upgrades are captain decisions, not worker decisions.
+IFS= read -r -d '' UPGRADE_RULE <<'EOF' || true
+8. Never change dependencies, frameworks, or lockfiles unless the task is explicitly an approved upgrade. A bug fix never rides an upgrade; if an upgrade seems needed, append `needs-decision [at=<epoch>]: {upgrade proposal and why}` and stop.
+EOF
+UPGRADE_RULE=${UPGRADE_RULE%$'\n'}
+
 if [ -n "$BASE_BRANCH" ]; then
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean copy of its base branch.
 Base branch: $BASE_BRANCH"
@@ -633,6 +639,8 @@ $CREWMATE_PAUSE_INSTRUCTIONS
    A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
    Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
+
+$UPGRADE_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 
@@ -713,6 +721,8 @@ $ASK_USER_BLOCK
    A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
    Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
+
+$UPGRADE_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 

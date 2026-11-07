@@ -1095,6 +1095,46 @@ test_wait_no_turns_absent_keeps_the_previous_brief() {
   pass "fm-brief: without config/wait-no-turns the brief and drive text stay as they were"
 }
 
+# The captain's standing rule: workers never decide on upgrades. Every ship and
+# scout brief must carry this as a numbered rule, and a secondmate charter must not.
+test_no_upgrade_rule_in_ship_and_scout_briefs() {
+  local home brief
+  home="$TMP_ROOT/no-upgrade-home"
+  mkdir -p "$home/data"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-upgrade-nm some-proj --mode no-mistakes >/dev/null 2>&1 \
+    || fail "no-mistakes ship brief should scaffold"
+  brief="$home/data/brief-upgrade-nm/brief.md"
+  assert_grep "Never change dependencies, frameworks, or lockfiles unless the task is explicitly an approved upgrade" "$brief" \
+    "ship brief missing the no-upgrade rule"
+  assert_grep "A bug fix never rides an upgrade" "$brief" \
+    "ship brief missing the bug-fix-never-rides-upgrade clause"
+  assert_grep "needs-decision [at=<epoch>]: {upgrade proposal and why}" "$brief" \
+    "ship brief missing the upgrade needs-decision status template"
+  assert_grep "8. Never change dependencies" "$brief" \
+    "ship brief does not number the no-upgrade rule as rule 8"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-upgrade-scout some-proj --scout >/dev/null 2>&1 \
+    || fail "scout brief should scaffold"
+  brief="$home/data/brief-upgrade-scout/brief.md"
+  assert_grep "Never change dependencies, frameworks, or lockfiles unless the task is explicitly an approved upgrade" "$brief" \
+    "scout brief missing the no-upgrade rule"
+  assert_grep "A bug fix never rides an upgrade" "$brief" \
+    "scout brief missing the bug-fix-never-rides-upgrade clause"
+  assert_grep "needs-decision [at=<epoch>]: {upgrade proposal and why}" "$brief" \
+    "scout brief missing the upgrade needs-decision status template"
+  assert_grep "8. Never change dependencies" "$brief" \
+    "scout brief does not number the no-upgrade rule as rule 8"
+
+  FM_HOME="$home" FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    "$ROOT/bin/fm-brief.sh" brief-upgrade-mate --secondmate --no-projects >/dev/null 2>&1 \
+    || fail "secondmate charter should scaffold"
+  assert_no_grep "Never change dependencies" "$home/data/brief-upgrade-mate/brief.md" \
+    "secondmate charter should not carry the crewmate no-upgrade rule"
+
+  pass "fm-brief.sh: ship and scout briefs carry the no-upgrade rule; secondmate charters do not"
+}
+
 test_worker_role_scope() {
   local kind home brief
   home="$TMP_ROOT/worker-role"
@@ -1493,6 +1533,7 @@ test_scout_and_secondmate_scaffold
 test_scout_lavish_line_follows_presentation_floor
 test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief
+test_no_upgrade_rule_in_ship_and_scout_briefs
 test_home_brief_include_is_appended_last
 test_base_branch_is_rendered_and_bounded
 test_ship_branch_prefix_defaults_to_legacy_fm
