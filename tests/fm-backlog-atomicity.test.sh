@@ -1951,6 +1951,25 @@ test_orca_cleanup_recovery_never_transitions_the_backlog() {
   pass "Orca cleanup recovery is excluded from backlog lifecycle transitions"
 }
 
+test_recovery_reports_missing_owned_row() {
+  local case_dir id=atomic-missing-owned out log rc=0
+  case_dir=$(make_home missing-owned "$id")
+  write_task_meta "$case_dir" "$id" ship no-mistakes "spawn_gen=spawn-missing-owned"
+  out=$(run_bootstrap "$case_dir")
+  assert_contains "$out" "task $id has no backlog item in this home" "missing owned row was silent"
+  assert_contains "$out" "Restore the original backlog item" "missing owned row has no recovery advice"
+  log="$(home_of "$case_dir")/state/.backlog-missing.log"
+  assert_grep "gate=reconcile id=$id expected=in_flight kind=ship spawn_gen=spawn-missing-owned" "$log" "missing-row evidence was not recorded"
+  out=$(FM_HOME="$(home_of "$case_dir")" FM_ROOT_OVERRIDE="$ROOT" PATH="$case_dir/fakebin:$PATH" \
+    "$ROOT/bin/fm-control.sh" "$id" relaunch --note "Resume work" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "control accepted a relaunch with no row"
+  assert_contains "$out" "expected state: In flight" "control did not explain the missing-row state"
+  assert_grep "gate=control-relaunch id=$id " "$log" "control did not record the detection"
+  assert_absent "$(home_of "$case_dir")/state/$id.control-relaunch" "control began relaunch before checking ownership"
+  if [ -n "$(row_state "$case_dir" "$id")" ]; then fail "a gate invented a row"; fi
+  pass "startup and relaunch control report and record missing owned rows without inventing them"
+}
+
 test_recovery_marks_an_owned_record_in_flight() {
   local case_dir id out
   id=atomic-heal-b8
@@ -3091,6 +3110,7 @@ test_completion_fails_when_its_close_marker_cannot_be_removed
 test_recovery_retries_when_a_close_marker_cannot_be_removed
 test_recovery_reports_an_owned_row_read_failure
 test_orca_cleanup_recovery_never_transitions_the_backlog
+test_recovery_reports_missing_owned_row
 test_recovery_marks_an_owned_record_in_flight
 test_recovery_rejects_an_internal_worker_record_symlink
 test_recovery_ignores_a_symlinked_worker_record

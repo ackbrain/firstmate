@@ -227,6 +227,36 @@ test_wrapper_refuses_add_start() {
   pass "fm-tasks-axi.sh refuses add --start while plain add and start <id> pass through"
 }
 
+test_wrapper_protects_owned_rows() {
+  local dir out rc=0
+  dir=$(make_split wrapper-owned)
+  wrapper_from_code "$dir" add live-1 "owned" >/dev/null || fail "could not add owned row"
+  wrapper_from_code "$dir" start live-1 >/dev/null || fail "could not start owned row"
+  touch "$dir/home/state/live-1.meta"
+  out=$(wrapper_from_code "$dir" prune --state=in_flight --keep 0 2>&1) || rc=$?
+  expect_code 2 "$rc" "pruning an owned row"
+  assert_contains "$out" live-1 "the refusal did not identify the owned row"
+  wrapper_from_code "$dir" show live-1 >/dev/null || fail "prune lost the live row"
+  rc=0
+  out=$(wrapper_from_code "$dir" delete live-1 2>&1) || rc=$?
+  expect_code 2 "$rc" "deleting an owned row"
+  assert_contains "$out" live-1 "delete refusal did not identify the owned row"
+  rc=0
+  out=$(wrapper_from_code "$dir" mv live-1 --to "$dir/other.md" 2>&1) || rc=$?
+  expect_code 2 "$rc" "moving an owned row"
+  assert_contains "$out" live-1 "move refusal did not identify the owned row"
+  wrapper_from_code "$dir" add stale-1 "unowned" >/dev/null || fail "could not add stale row"
+  wrapper_from_code "$dir" rm stale-1 >/dev/null || fail "owned neighbor blocked deletion of an unowned row"
+  wrapper_from_code "$dir" add closed-1 "done" >/dev/null || fail "could not add completion fixture"
+  wrapper_from_code "$dir" 'done' closed-1 >/dev/null || fail "could not close fixture row"
+  touch "$dir/home/state/closed-1.meta"
+  wrapper_from_code "$dir" prune --keep 0 >/dev/null || fail "could not prune Done despite leftover metadata"
+  wrapper_from_code "$dir" show live-1 >/dev/null || fail "Done retention lost the live row"
+  wrapper_from_code "$dir" rm live-1 --force >/dev/null || fail "explicit override failed"
+  if wrapper_from_code "$dir" show live-1 >/dev/null 2>&1; then fail "forced delete left the row"; fi
+  pass "explicit destructive commands protect owned rows unless forced"
+}
+
 test_wrapper_single_home() {
   local dir
   dir="$TMP_ROOT/single-wrapper"
@@ -249,6 +279,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_wrapper_refusals
   test_wrapper_refuses_add_start
   test_wrapper_single_home
+  test_wrapper_protects_owned_rows
 else
   echo "skip: tasks-axi not found; home-addressing cases not run"
 fi
