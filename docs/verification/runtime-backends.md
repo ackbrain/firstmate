@@ -2494,3 +2494,12 @@ Without Firstmate's hooks, Herdr reported the question panel as `blocked`, which
 This live proof covers the watcher and queue boundary; it does not establish live daemon-consumer delivery.
 `bin/fm-test-run.sh tests/fm-daemon.test.sh` exercises that consumer routing separately with portable regressions for busy escalation and busy-bookkeeping failures in away and quiet mode.
 Repeat the hooked-worker check above before publication if watcher or task-inbox busy code changes; `bin/fm-test-run.sh tests/fm-task-inbox.test.sh` refreshes the portable ladder regressions.
+
+### 2026-11-20 opencode 1.19.5 status row beneath Build/Plan footer
+
+Verified on 2026-11-20 against opencode 1.19.5 (command: `opencode --version`).
+Portable regression in tests/fm-composer-lib.test.sh and live matrix guard now
+classify empty correctly; status line with working path+version is treated as
+furniture (extended FM_COMPOSER_LEFTBAR_FOOTER_RE, unconditional skip in
+_fm_composer_classify_leftbar). Negative cases confirm ordinary terminal output
+is not misclassified empty.

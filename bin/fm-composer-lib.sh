@@ -472,9 +472,10 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
-# ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
-# text, and only the run's LAST row is ever matched against it.
-FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+'
+# ("Build · GPT-5.5 Fast OpenAI · high") and in 1.19.x a status row with
+# working path and version beneath it. Both are composer furniture, not typed
+# text; the regex matches either so the left-bar classifier skips them.
+FM_COMPOSER_LEFTBAR_FOOTER_RE_DEFAULT='^(Build|Plan)[[:space:]]+·[[:space:]]+|[[:space:]]*/[^[:space:]]+.*[0-9]+\.[0-9]+'
 # Claude draws its permission-mode hint on its own row directly below the
 # composer (` ⏵⏵ bypass permissions on (shift+tab to cycle)`, ` ⏵⏵ accept edits
 # on`, ` ⏸ plan mode on`; verified live through Herdr on claude 2.1.236). The
@@ -1320,9 +1321,9 @@ _fm_composer_classify_bare_wrap() {  # <screen> <styled> <glyph-row> <cursor-row
 }
 
 # _fm_composer_classify_leftbar: opencode's left-bar composer. Blank rows and
-# the idle hint read empty; the run's LAST row may be the mode/model footer
-# (composer furniture, never typed text). Real content is pending when styling
-# can prove it real, unknown otherwise.
+# the idle hint read empty; known footer/status lines (Build/Plan or path+version)
+# are composer furniture and skipped wherever they appear. Real content is
+# pending when styling can prove it real, unknown otherwise.
 _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
   local screen=$1 styled=$2 first=$3 last=$4
   local row raw content pending_seen=0 footer_re leading_blank=1 placeholder_position=0
@@ -1346,8 +1347,7 @@ _fm_composer_classify_leftbar() {  # <screen> <styled> <first-row> <last-row>
        && fm_composer_idle_matches "$content" "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive; then
       row=$((row + 1)); continue
     fi
-    if [ "$row" -eq "$last" ] \
-       && fm_composer_idle_matches "$content" "$footer_re" sensitive; then
+    if fm_composer_idle_matches "$content" "$footer_re" sensitive; then
       row=$((row + 1)); continue
     fi
     pending_seen=1
