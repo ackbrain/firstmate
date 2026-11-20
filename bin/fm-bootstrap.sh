@@ -1289,7 +1289,11 @@ backlog_record_reconcile() {
       row=
       if fm_backlog_row_probe "$DATA" "$id"; then
         row=$FM_BACKLOG_ROW_STATE
-      elif [ "$FM_BACKLOG_ROW_RESULT" != not_found ]; then
+      elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+        if fm_backlog_missing_owned_row "$STATE" "$id" reconcile; then
+          echo "BACKLOG_RECONCILE: $id: $FM_BACKLOG_ROW_ERROR"
+        fi
+      else
         echo "BACKLOG_RECONCILE: $id: worker record exists but its backlog item could not be read: $FM_BACKLOG_ROW_ERROR"
       fi
       # Heal only the unambiguous case: a queued row for a record this home

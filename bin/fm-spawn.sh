@@ -3642,7 +3642,11 @@ if fm_backlog_transition_applies "$CONFIG" "$DATA" "$KIND"; then
   if fm_backlog_row_probe "$DATA" "$ID"; then
     BACKLOG_ROW_STATE=$FM_BACKLOG_ROW_STATE
   elif [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
-    echo "error: task $ID has no backlog item in this home, so dispatching it would leave a worker no record owns; add it first (bin/fm-tasks-axi.sh add $ID '<title>' --kind $KIND) and re-run" >&2
+    if fm_backlog_missing_owned_row "$STATE" "$ID" spawn; then
+      echo "error: $FM_BACKLOG_ROW_ERROR" >&2
+    else
+      echo "error: task $ID has no backlog item in this home, so dispatching it would leave a worker no record owns; add it first (bin/fm-tasks-axi.sh add $ID '<title>' --kind $KIND) and re-run" >&2
+    fi
     exit 1
   else
     echo "error: task $ID's backlog item could not be read before dispatch ($FM_BACKLOG_ROW_ERROR)" >&2
@@ -5174,7 +5178,8 @@ spawn_report_preserved_state() {
   fi
   if ! fm_backlog_row_probe "$DATA" "$ID"; then
     if [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
-      SPAWN_PRESERVED_CLAIM="preservation could not be verified: its backlog item was not found; close out its paired task record by hand"
+      fm_backlog_missing_owned_row "$STATE" "$ID" spawn-preservation || true
+      SPAWN_PRESERVED_CLAIM="preservation could not be verified: ${FM_BACKLOG_ROW_ERROR:-its backlog item was not found}"
     else
       SPAWN_PRESERVED_CLAIM="preservation could not be verified: its backlog item state is unreadable (${FM_BACKLOG_ROW_ERROR:-no error recorded}); close out its paired task record and backlog item by hand"
     fi

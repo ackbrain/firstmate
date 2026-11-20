@@ -476,6 +476,25 @@ fm_backlog_row_probe() {  # <data-dir> <id>
   return 0
 }
 
+# Record a confirmed missing row for a live task. The home-local append-only
+# state/.backlog-missing.log records epoch, detecting gate, ID, expected state,
+# kind and spawn generation. It is evidence, not authority to recreate a row.
+fm_backlog_missing_owned_row() {  # <state-dir> <id> <gate>
+  local state=$1 id=$2 gate=$3 meta="$1/$2.meta" log="$1/.backlog-missing.log"
+  local kind gen now
+  fm_backlog_record_present "$meta" "task record" "$state" || return 1
+  kind=$(fm_meta_get "$meta" kind)
+  gen=$(fm_meta_get "$meta" spawn_gen)
+  FM_BACKLOG_ROW_ERROR="task $id has no backlog item in this home (live task record: $meta; expected state: In flight). Restore the original backlog item from history or backup, preserving its details, then retry; do not remove the task record or worktree."
+  if now=$(date +%s) && [ ! -L "$log" ] && { [ ! -e "$log" ] || [ -f "$log" ]; } &&
+    (umask 077; printf 'at=%s gate=%s id=%s expected=in_flight kind=%q spawn_gen=%q\n' \
+      "$now" "$gate" "$id" "$kind" "$gen" >> "$log"); then
+    return 0
+  fi
+  FM_BACKLOG_ROW_ERROR="$FM_BACKLOG_ROW_ERROR Could not append evidence to $log."
+  return 0
+}
+
 # Run one tasks-axi mutation against <home>'s backlog, capturing its first
 # output line in FM_BACKLOG_TRANSITION_ERROR on failure. The home boundary is
 # authorized through fm_backlog_source_present first; fm_backlog_tasks_axi owns
@@ -808,7 +827,11 @@ fm_backlog_dispatch_transition() {
   row_status=$?
   if [ "$row_status" -ne 0 ]; then
     if [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
-      FM_BACKLOG_TRANSITION_ERROR="backlog item $id vanished before dispatch commit"
+      if fm_backlog_missing_owned_row "$state" "$id" dispatch-commit; then
+        FM_BACKLOG_TRANSITION_ERROR="backlog item $id vanished before dispatch commit: $FM_BACKLOG_ROW_ERROR"
+      else
+        FM_BACKLOG_TRANSITION_ERROR="backlog item $id vanished before dispatch commit"
+      fi
     else
       FM_BACKLOG_TRANSITION_ERROR=$FM_BACKLOG_ROW_ERROR
     fi

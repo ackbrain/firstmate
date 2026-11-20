@@ -1072,6 +1072,23 @@ do_relaunch() {
   local exit_result state note_line
   local -a spawn_args
 
+  # Check backlog ownership here, before stopping the old agent; spawn
+  # rechecks it before publishing the replacement.
+  # shellcheck source=bin/fm-tasks-axi-lib.sh
+  . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
+  # shellcheck source=bin/fm-backlog-transition-lib.sh
+  . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+  if fm_backlog_transition_applies "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$DATA" "$KIND"; then
+    if ! fm_backlog_row_probe "$DATA" "$ID"; then
+      if [ "$FM_BACKLOG_ROW_RESULT" = not_found ]; then
+        fm_backlog_missing_owned_row "$STATE" "$ID" control-relaunch \
+          || die "task $ID and its backlog item could not be revalidated"
+      fi
+      die "cannot relaunch $ID: $FM_BACKLOG_ROW_ERROR"
+    fi
+  elif [ "$?" = 2 ]; then
+    die "cannot relaunch $ID: $FM_BACKLOG_TRANSITION_ERROR"
+  fi
   require_state_verified_backend relaunch
   resolve_relaunch_profile
 
