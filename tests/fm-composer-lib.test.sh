@@ -702,6 +702,26 @@ test_matrix_opencode_leftbar_signals() {
   assert_screen "opencode placeholder-like input on plain backends" unknown "$CAPS_PLAIN" "$typed"
   typed=$'┃  refactor the parser please\n┃\n┃  Build · GPT-5.5 Fast OpenAI · high'
   assert_screen "opencode multiline draft above blank cursor row" pending "$CAPS_TMUX" "$typed" 1
+  # OpenCode 1.19.x adds a status row (working path + version) beneath the
+  # Build/Plan footer. The extended FOOTER_RE and unconditional skip keep
+  # empty classification working; the old footer shape remains supported.
+  screen_119=$'  ┃
+  ┃  Ask anything... "What is the tech stack?"
+  ┃
+  ┃  Build · GPT-5.5 Fast OpenAI · high
+  ┃  /tmp/project   v1.19.5
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀'
+  assert_screen "opencode 1.19.x idle with status row on tmux" empty "$CAPS_TMUX" "$screen_119" 1
+  assert_screen "opencode 1.19.x idle with status row on plain" empty "$CAPS_PLAIN" "$screen_119"
+  # Negative cases: ordinary terminal output must not match the footer/status
+  # regex and must not be misclassified as empty composer.
+  ordinary_last=$'  ┃
+  ┃  Ask anything...
+  ┃
+  ┃  total 123
+  ┃  drwxr-xr-x  5 user  staff  160 Nov 20 03:27 foo'
+  out=$(fm_composer_classify_screen "$CAPS_PLAIN" "$ordinary_last")
+  [ "$out" != empty ] || fail "ordinary terminal output must not match footer regex and be misclassified empty, got '$out'"
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
